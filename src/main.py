@@ -1,7 +1,6 @@
 """CLI integrasi Anggota 3. Bisa dipanggil sebagai script atau module."""
 import argparse
 import json
-import math
 from pathlib import Path
 import random
 import sys
@@ -13,41 +12,15 @@ if __package__ in (None, ""):
 from src.algorithms.hill_climbing import hill_climb, VALID_VARIANTS
 from src.algorithms.simulated_annealing import simulated_annealing
 from src.algorithms.genetic_algorithm import genetic_algorithm
+from src.core.input import load_problem
 from src.core.initialization import generate_random_state
 from src.core.constraints import is_valid_state
 from src.core.objective import OBJECTIVE_MODES, calculate_objective
-from src.models.ship import Ship
-from src.models.vehicle import Vehicle
 from src.visualization.export import export_result, export_experiments
 from src.experiments.runner import run_experiments
 
 ROOT = Path(__file__).resolve().parents[1]
 
-
-def load_problem(path):
-    with Path(path).open(encoding="utf-8") as stream:
-        data = json.load(stream)
-    if not isinstance(data, dict) or not isinstance(data.get("ship"), dict) or not isinstance(data.get("vehicles"), list):
-        raise ValueError("Input memerlukan object ship dan array vehicles")
-    # Validasi sebelum from_dict agar angka pecahan tidak diam-diam dibulatkan oleh core.
-    for item in [data["ship"], *data["vehicles"]]:
-        if not isinstance(item, dict):
-            raise ValueError("Setiap kendaraan harus berupa object")
-        for key, value in item.items():
-            if key == "id":
-                continue
-            if isinstance(value, bool) or not isinstance(value, (float, int)) or not math.isfinite(value):
-                raise ValueError(f"{key} harus berupa angka finite")
-        for key in ("width", "length"):
-            if type(item.get(key)) is not int or item[key] <= 0:
-                raise ValueError(f"{key} harus integer positif")
-    ship = Ship.from_dict(data["ship"])
-    vehicles = [Vehicle.from_dict(v) for v in data["vehicles"]]
-    if not vehicles:
-        raise ValueError("Minimal satu kendaraan diperlukan")
-    if len({v.id for v in vehicles}) != len(vehicles):
-        raise ValueError("ID kendaraan harus unik")
-    return ship, vehicles
 
 
 def print_result(result, algorithm):
@@ -58,7 +31,10 @@ def print_result(result, algorithm):
         print("Inside :", ", ".join(p.vehicle.id for p in state.inside_placements) or "-")
         print("Outside:", ", ".join(p.vehicle.id for p in state.outside_placements) or "-")
         print(f"Objective: {state.objective_value:g} | ShippingFee: {calculate_objective(state):g}")
-        print(f"Berat: {state.total_weight:g} / {state.ship.max_capacity:g} | Valid: {is_valid_state(state)}")
+        print(f"Fleet weight: {state.total_weight:g} | Valid: {is_valid_state(state)}")
+        for ship in state.ships:
+            revenue = sum(p.vehicle.shipping_fee for p in state.placements_on(ship.id))
+            print(f"Ship {ship.id}: weight {state.weight_on(ship.id):g}/{ship.max_capacity:g}, ShippingFee {revenue:g}")
     print(f"\nIterasi/generasi: {result.get('iterations', result.get('generations'))}")
     print(f"Durasi algoritma (tanpa render): {result['duration']:.6f} detik")
     for key in ("variant", "maximum_sideways", "sideways_moves", "restarts", "iterations_per_restart",

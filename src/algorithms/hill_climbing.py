@@ -23,6 +23,7 @@ def _state_key(state: State) -> tuple[tuple[object, ...], ...]:
         (
             placement.vehicle.id,
             placement.inside,
+            placement.ship_id,
             placement.x,
             placement.y,
             placement.orientation.value,
@@ -138,7 +139,7 @@ def _random_restart(
 
     for _ in range(max_restart):
         restart_state = generate_random_state(
-            initial_state.ship,
+            initial_state.ships,
             initial_state.vehicles,
             objective_mode=objective_mode,
             rng=generator,

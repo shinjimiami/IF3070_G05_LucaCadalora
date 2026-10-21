@@ -14,6 +14,8 @@ from src.core.objective import calculate_objective, calculate_total_weight
 
 def draw_state(state, title="State", save_path=None, objective_mode="shipping_fee"):
     """(0,0) kiri bawah; x=width, y=length. Return Figure; pemanggil menutupnya."""
+    if len(state.ships) > 1:
+        return draw_fleet(state, title, save_path, objective_mode)
     fig, (ax, info) = plt.subplots(1, 2, figsize=(12, 8),
                                    gridspec_kw={"width_ratios": [1.5, 1]})
     colors = {p.vehicle.id: plt.get_cmap("tab20")(i % 20)
@@ -48,6 +50,42 @@ def draw_state(state, title="State", save_path=None, objective_mode="shipping_fe
     info.text(0, 1, "\n".join(lines), va="top", fontsize=10, linespacing=1.5,
               transform=info.transAxes)
     fig.tight_layout()
+    if save_path is not None:
+        destination = Path(save_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(destination, dpi=150, bbox_inches="tight")
+    return fig
+
+
+def draw_fleet(state, title, save_path, objective_mode):
+    import math
+    count = len(state.ships)
+    columns = min(3, count)
+    rows = math.ceil(count / columns)
+    fig, axes = plt.subplots(rows, columns, figsize=(6 * columns, 6 * rows + 2), squeeze=False)
+    colors = {p.vehicle.id: plt.get_cmap("tab20")(i % 20) for i, p in enumerate(state.placements)}
+    for ax, ship in zip(axes.flat, state.ships):
+        placements = state.placements_on(ship.id)
+        revenue = sum(p.vehicle.shipping_fee for p in placements)
+        ax.set(xlim=(0, ship.width), ylim=(0, ship.length), xlabel="x", ylabel="y",
+               title=f"Ship {ship.id} | weight {state.weight_on(ship.id):g}/{ship.max_capacity:g} | fee {revenue:g}")
+        ax.set_aspect("equal")
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.grid(alpha=.25)
+        for p in placements:
+            ax.add_patch(Rectangle((p.x, p.y), p.placed_width, p.placed_length,
+                                  facecolor=colors[p.vehicle.id], edgecolor="#253248"))
+            ax.text(p.x + p.placed_width / 2, p.y + p.placed_length / 2,
+                    f"{p.vehicle.id}\n{p.orientation.value[0].upper()}", ha="center", va="center", fontsize=8)
+    for ax in list(axes.flat)[count:]:
+        ax.axis("off")
+    outside = ", ".join(p.vehicle.id for p in state.outside_placements) or "-"
+    summary = f"{title} | {objective_mode}: {calculate_objective(state, objective_mode):g} | Fleet ShippingFee: {calculate_objective(state):g} | Weight: {calculate_total_weight(state):g} | Valid: {is_valid_state(state)}"
+    fig.suptitle("\n".join(textwrap.wrap(summary, 110)), fontsize=12)
+    footer = "\n".join(textwrap.wrap(f"Outside: {outside}", 110))
+    fig.text(.02, .02, footer, va="bottom", fontsize=10)
+    fig.tight_layout(rect=(0, min(.35, .04 + .025 * len(footer.splitlines())), 1, .9))
     if save_path is not None:
         destination = Path(save_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
