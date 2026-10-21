@@ -4,38 +4,13 @@ from time import perf_counter
 from typing import Any
 
 from src.core.constraints import is_valid_state
-from src.core.neighbor import move_vehicle, rotate_vehicle, swap_vehicles
+from src.core.neighbor import random_move, random_removal, rotate_vehicle, swap_vehicles
 from src.core.objective import with_updated_metrics
-from src.models.state import Orientation, State
+from src.models.state import State
 
 
-def _random_move(
-    state: State,
-    generator: random.Random,
-    objective_mode: str,
-) -> State | None:
-    placement = generator.choice(state.placements)
-    orientation = generator.choice(list(Orientation))
-    placed_width = (
-        placement.vehicle.width
-        if orientation is Orientation.HORIZONTAL
-        else placement.vehicle.length
-    )
-    placed_length = (
-        placement.vehicle.length
-        if orientation is Orientation.HORIZONTAL
-        else placement.vehicle.width
-    )
-    if placed_width > state.ship.width or placed_length > state.ship.length:
-        return None
-    return move_vehicle(
-        state,
-        placement.vehicle.id,
-        generator.randrange(state.ship.width - placed_width + 1),
-        generator.randrange(state.ship.length - placed_length + 1),
-        orientation,
-        objective_mode,
-    )
+def _random_move(state, generator, objective_mode):
+    return random_move(state, generator, objective_mode)
 
 
 def _random_rotation(
@@ -71,7 +46,7 @@ def _random_neighbor(
     objective_mode: str,
     attempts: int,
 ) -> State | None:
-    operations = (_random_move, _random_rotation, _random_swap)
+    operations = (_random_move, _random_rotation, _random_swap, random_removal)
     for _ in range(attempts):
         operation = generator.choice(operations)
         candidate = operation(state, generator, objective_mode)

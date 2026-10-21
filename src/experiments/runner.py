@@ -14,12 +14,9 @@ from src.models.state import State
 from src.models.vehicle import Vehicle
 
 
-def _load_problem(path: str | Path) -> tuple[Ship, list[Vehicle]]:
-    with Path(path).open(encoding="utf-8") as stream:
-        data = json.load(stream)
-    ship = Ship.from_dict(data["ship"])
-    vehicles = [Vehicle.from_dict(item) for item in data["vehicles"]]
-    return ship, vehicles
+def _load_problem(path: str | Path) -> tuple[tuple[Ship, ...], list[Vehicle]]:
+    from src.core.input import load_problem
+    return load_problem(path)
 
 
 def _serialize_value(value: Any) -> Any:
@@ -33,7 +30,7 @@ def _serialize_value(value: Any) -> Any:
 
 
 def _initial_state(
-    ship: Ship,
+    ship: tuple[Ship, ...],
     vehicles: list[Vehicle],
     seed: int,
 ) -> State:
@@ -41,7 +38,7 @@ def _initial_state(
 
 
 def _run_hill_climbing(
-    ship: Ship,
+    ship: tuple[Ship, ...],
     vehicles: list[Vehicle],
     config: dict[str, Any],
 ) -> list[dict[str, Any]]:
@@ -59,7 +56,7 @@ def _run_hill_climbing(
 
 
 def _run_simulated_annealing(
-    ship: Ship,
+    ship: tuple[Ship, ...],
     vehicles: list[Vehicle],
     config: dict[str, Any],
 ) -> list[dict[str, Any]]:
@@ -77,7 +74,7 @@ def _run_simulated_annealing(
 
 
 def _run_genetic_configuration(
-    ship: Ship,
+    ship: tuple[Ship, ...],
     vehicles: list[Vehicle],
     config: dict[str, Any],
     population_size: int,
@@ -114,7 +111,7 @@ def _run_genetic_configuration(
 
 
 def _run_genetic_algorithm(
-    ship: Ship,
+    ship: tuple[Ship, ...],
     vehicles: list[Vehicle],
     config: dict[str, Any],
 ) -> dict[str, list[dict[str, Any]]]:
@@ -162,7 +159,7 @@ def run_experiments(
     config = load_experiment_config(config_path)
     results = {
         "input": {
-            "ship": ship.to_dict(),
+            "ships": [item.to_dict() for item in ship],
             "vehicles": [vehicle.to_dict() for vehicle in vehicles],
         },
         "configuration": config,
