@@ -1,0 +1,66 @@
+{
+  "ships": [
+    {
+      "id": "A",
+      "width": 4,
+      "length": 4,
+      "maxCapacity": 300
+    },
+    {
+      "id": "B",
+      "width": 3,
+      "length": 4,
+      "maxCapacity": 220
+    }
+  ],
+  "vehicles": [
+    {
+      "id": "A",
+      "width": 3,
+      "length": 4,
+      "shippingFee": 180,
+      "weight": 200,
+      "ETA": 2
+    },
+    {
+      "id": "B",
+      "width": 2,
+      "length": 5,
+      "shippingFee": 160,
+      "weight": 180,
+      "ETA": 1
+    },
+    {
+      "id": "C",
+      "width": 4,
+      "length": 4,
+      "shippingFee": 250,
+      "weight": 280,
+      "ETA": 3
+    },
+    {
+      "id": "D",
+      "width": 2,
+      "length": 3,
+      "shippingFee": 100,
+      "weight": 100,
+      "ETA": 2
+    },
+    {
+      "id": "E",
+      "width": 3,
+      "length": 3,
+      "shippingFee": 140,
+      "weight": 150,
+      "ETA": 1
+    },
+    {
+      "id": "F",
+      "width": 2,
+      "length": 4,
+      "shippingFee": 130,
+      "weight": 140,
+      "ETA": 4
+    }
+  ]
+}
