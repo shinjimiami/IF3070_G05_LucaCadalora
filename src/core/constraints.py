@@ -4,20 +4,24 @@ from src.models.state import Placement, State
 
 
 def is_inside_boundary(state: State) -> bool:
+    ships = {ship.id: ship for ship in state.ships}
     for placement in state.inside_placements:
+        if placement.ship_id not in ships:
+            return False
+        ship = ships[placement.ship_id]
         if placement.x is None or placement.y is None:
             return False
         if placement.x < 0 or placement.y < 0:
             return False
-        if placement.x + placement.placed_width > state.ship.width:
+        if placement.x + placement.placed_width > ship.width:
             return False
-        if placement.y + placement.placed_length > state.ship.length:
+        if placement.y + placement.placed_length > ship.length:
             return False
     return True
 
 
 def placements_overlap(first: Placement, second: Placement) -> bool:
-    if not first.inside or not second.inside:
+    if not first.inside or not second.inside or first.ship_id != second.ship_id:
         return False
     if first.x is None or first.y is None or second.x is None or second.y is None:
         return False
@@ -37,9 +41,15 @@ def has_overlap(state: State) -> bool:
 
 
 def within_capacity(state: State) -> bool:
-    weight = sum(placement.vehicle.weight for placement in state.inside_placements)
-    return weight <= state.ship.max_capacity
+    return all(state.weight_on(ship.id) <= ship.max_capacity for ship in state.ships)
 
 
 def is_valid_state(state: State) -> bool:
-    return is_inside_boundary(state) and not has_overlap(state) and within_capacity(state)
+    ids = [p.vehicle.id for p in state.placements]
+    ship_ids = {ship.id for ship in state.ships}
+    assignments_valid = all(
+        p.ship_id in ship_ids if p.inside else p.ship_id is None
+        for p in state.placements
+    )
+    return (len(ids) == len(set(ids)) and assignments_valid
+            and is_inside_boundary(state) and not has_overlap(state) and within_capacity(state))
