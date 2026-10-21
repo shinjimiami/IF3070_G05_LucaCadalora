@@ -20,17 +20,12 @@ def move_vehicle(
     y: int,
     orientation: Orientation | str | None = None,
     objective_mode: str = "shipping_fee",
-    ship_id: str | None = None,
 ) -> State | None:
     index = _find_index(state, vehicle_id)
     current = state.placements[index]
-    target = ship_id or current.ship_id or state.ships[0].id
-    if target not in {ship.id for ship in state.ships}:
-        raise ValueError("Unknown ship id")
     placement = Placement(
         vehicle=current.vehicle,
         inside=True,
-        ship_id=target,
         x=x,
         y=y,
         orientation=orientation or current.orientation,
@@ -56,7 +51,6 @@ def rotate_vehicle(
         x=current.x,
         y=current.y,
         orientation=current.orientation.rotated(),
-        ship_id=current.ship_id,
     )
     candidate = state.replace_placement(index, placement)
     if not is_valid_state(candidate):
@@ -84,7 +78,6 @@ def swap_vehicles(
     placements[first_index] = Placement(
         vehicle=first.vehicle,
         inside=second.inside,
-        ship_id=second.ship_id,
         x=second.x if second.inside else None,
         y=second.y if second.inside else None,
         orientation=second.orientation,
@@ -92,7 +85,6 @@ def swap_vehicles(
     placements[second_index] = Placement(
         vehicle=second.vehicle,
         inside=first.inside,
-        ship_id=first.ship_id,
         x=first.x if first.inside else None,
         y=first.y if first.inside else None,
         orientation=first.orientation,
@@ -103,49 +95,41 @@ def swap_vehicles(
     return with_updated_metrics(candidate, objective_mode)
 
 
-def remove_vehicle(state, vehicle_id, objective_mode="shipping_fee"):
-    index = _find_index(state, vehicle_id)
-    if not state.placements[index].inside:
-        return None
-    return with_updated_metrics(state.replace_placement(index, Placement.outside(state.placements[index].vehicle)), objective_mode)
-
-
 def _move_candidates(state: State, objective_mode: str) -> Iterator[State]:
     for placement in state.placements:
-        for ship in state.ships:
-            for orientation in Orientation:
-                width = placement.vehicle.width if orientation is Orientation.HORIZONTAL else placement.vehicle.length
-                length = placement.vehicle.length if orientation is Orientation.HORIZONTAL else placement.vehicle.width
-                for y in range(ship.length - length + 1):
-                    for x in range(ship.width - width + 1):
-                        if (placement.inside and placement.ship_id == ship.id and
-                            (x, y, orientation) == (placement.x, placement.y, placement.orientation)):
-                            continue
-                        candidate = move_vehicle(state, placement.vehicle.id, x, y, orientation, objective_mode, ship.id)
-                        if candidate is not None:
-                            yield candidate
-        if placement.inside:
-            yield remove_vehicle(state, placement.vehicle.id, objective_mode)
-
-
-def random_move(state, generator, objective_mode="shipping_fee"):
-    if not state.placements:
-        return None
-    placement = generator.choice(state.placements)
-    ship = generator.choice(state.ships)
-    orientation = generator.choice(list(Orientation))
-    width = placement.vehicle.width if orientation is Orientation.HORIZONTAL else placement.vehicle.length
-    length = placement.vehicle.length if orientation is Orientation.HORIZONTAL else placement.vehicle.width
-    if width > ship.width or length > ship.length:
-        return None
-    return move_vehicle(state, placement.vehicle.id, generator.randrange(ship.width - width + 1),
-                        generator.randrange(ship.length - length + 1), orientation, objective_mode, ship.id)
-
-
-def random_removal(state, generator, objective_mode="shipping_fee"):
-    if not state.inside_placements:
-        return None
-    return remove_vehicle(state, generator.choice(state.inside_placements).vehicle.id, objective_mode)
+        orientations = [placement.orientation]
+        if not placement.inside:
+            orientations = [Orientation.HORIZONTAL, Orientation.VERTICAL]
+        for orientation in orientations:
+            placed_width = (
+                placement.vehicle.width
+                if orientation is Orientation.HORIZONTAL
+                else placement.vehicle.length
+            )
+            placed_length = (
+                placement.vehicle.length
+                if orientation is Orientation.HORIZONTAL
+                else placement.vehicle.width
+            )
+            for y in range(state.ship.length - placed_length + 1):
+                for x in range(state.ship.width - placed_width + 1):
+                    if (
+                        placement.inside
+                        and x == placement.x
+                        and y == placement.y
+                        and orientation is placement.orientation
+                    ):
+                        continue
+                    candidate = move_vehicle(
+                        state,
+                        placement.vehicle.id,
+                        x,
+                        y,
+                        orientation,
+                        objective_mode,
+                    )
+                    if candidate is not None:
+                        yield candidate
 
 
 def _rotate_candidates(state: State, objective_mode: str) -> Iterator[State]:
@@ -173,7 +157,6 @@ def _state_key(state: State) -> tuple[tuple[object, ...], ...]:
         (
             placement.vehicle.id,
             placement.inside,
-            placement.ship_id,
             placement.x,
             placement.y,
             placement.orientation.value,

@@ -27,12 +27,10 @@ def serialize(value):
 
 
 def restore_state(data):
-    ships = tuple(Ship.from_dict(item) for item in data.get("ships", [data.get("ship")]))
-    return State(ships=ships, placements=[
+    return State(Ship.from_dict(data["ship"]), [
         Placement(Vehicle.from_dict(p["vehicle"]), inside=p["inside"], x=p["x"], y=p["y"],
-                  orientation=p["orientation"], ship_id=p.get("ship_id")) for p in data["placements"]],
+                  orientation=p["orientation"]) for p in data["placements"]],
         objective_value=data["objectiveValue"], total_weight=data["totalWeight"])
-
 
 
 def write_csv(path, rows):
@@ -91,8 +89,6 @@ def export_experiments(results, destination):
                          "population_size": r.get("population_size", ""),
                          "generations": r.get("generations", ""), "duration": r["duration"],
                          "stuck_count": r.get("stuck_count", ""),
-                         "ship_count": len(final.ships),
-                         "per_ship": json.dumps({s.id: {"weight": final.weight_on(s.id), "shipping_fee": sum(p.vehicle.shipping_fee for p in final.placements_on(s.id))} for s in final.ships}),
                          "valid": is_valid_state(final)})
     write_csv(destination / "results.csv", rows)
     for experiment, parameter in [("A", "generations"), ("B", "population_size")]:

@@ -4,9 +4,9 @@ from typing import Any
 
 from src.core.constraints import is_valid_state
 from src.core.initialization import generate_random_state
-from src.core.neighbor import random_move, random_removal, rotate_vehicle, swap_vehicles
+from src.core.neighbor import move_vehicle, rotate_vehicle, swap_vehicles
 from src.core.objective import with_updated_metrics
-from src.models.state import Placement, State
+from src.models.state import Orientation, Placement, State
 
 
 def _build_valid_child(
@@ -15,7 +15,7 @@ def _build_valid_child(
     objective_mode: str,
 ) -> State:
     child = State(
-        ships=parent.ships,
+        ship=parent.ship,
         placements=[Placement.outside(placement.vehicle) for placement in genes],
     )
     for index, gene in enumerate(genes):
@@ -48,8 +48,33 @@ def _crossover(
     )
 
 
-def _mutation_move(state, generator, objective_mode):
-    return random_move(state, generator, objective_mode)
+def _mutation_move(
+    state: State,
+    generator: random.Random,
+    objective_mode: str,
+) -> State | None:
+    placement = generator.choice(state.placements)
+    orientation = generator.choice(list(Orientation))
+    placed_width = (
+        placement.vehicle.width
+        if orientation is Orientation.HORIZONTAL
+        else placement.vehicle.length
+    )
+    placed_length = (
+        placement.vehicle.length
+        if orientation is Orientation.HORIZONTAL
+        else placement.vehicle.width
+    )
+    if placed_width > state.ship.width or placed_length > state.ship.length:
+        return None
+    return move_vehicle(
+        state,
+        placement.vehicle.id,
+        generator.randrange(state.ship.width - placed_width + 1),
+        generator.randrange(state.ship.length - placed_length + 1),
+        orientation,
+        objective_mode,
+    )
 
 
 def _mutation_rotation(
@@ -88,7 +113,7 @@ def _mutate(
 ) -> State:
     if generator.random() >= mutation_rate:
         return state
-    operations = (_mutation_move, _mutation_rotation, _mutation_swap, random_removal)
+    operations = (_mutation_move, _mutation_rotation, _mutation_swap)
     for _ in range(mutation_attempts):
         operation = generator.choice(operations)
         candidate = operation(state, generator, objective_mode)
@@ -152,7 +177,7 @@ def genetic_algorithm(
     for _ in range(population_size - 1):
         population.append(
             generate_random_state(
-                state.ships,
+                state.ship,
                 state.vehicles,
                 objective_mode=objective_mode,
                 rng=generator,
@@ -207,7 +232,6 @@ def genetic_algorithm(
         "final_state": best,
         "best_objective": best.objective_value,
         "generations": generations,
-        "iterations": generations,
         "duration": perf_counter() - started_at,
         "history": history,
         "population_size": population_size,

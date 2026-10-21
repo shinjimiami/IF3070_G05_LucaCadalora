@@ -9,16 +9,16 @@ from src.models.vehicle import Vehicle
 
 
 def create_outside_state(
-    ship: Ship | Iterable[Ship],
+    ship: Ship,
     vehicles: Iterable[Vehicle],
     objective_mode: str = "shipping_fee",
 ) -> State:
-    state = State(ships=(ship,) if isinstance(ship, Ship) else tuple(ship), placements=[Placement.outside(vehicle) for vehicle in vehicles])
+    state = State(ship=ship, placements=[Placement.outside(vehicle) for vehicle in vehicles])
     return with_updated_metrics(state, objective_mode)
 
 
 def generate_random_state(
-    ship: Ship | Iterable[Ship],
+    ship: Ship,
     vehicles: Iterable[Vehicle],
     objective_mode: str = "shipping_fee",
     max_attempts: int = 100,
@@ -40,50 +40,40 @@ def generate_random_state(
         vehicle = vehicle_list[index]
         if generator.random() > inclusion_probability:
             continue
-        eligible = [s for s in state.ships if state.weight_on(s.id) + vehicle.weight <= s.max_capacity]
-        generator.shuffle(eligible)
-        for ship in eligible:
-            candidate = _place_vehicle(state, index, vehicle, ship, generator, max_attempts, objective_mode)
-            if candidate is not None:
-                state = candidate
+        if state.total_weight + vehicle.weight > ship.max_capacity:
+            continue
+
+        orientations = [
+            orientation
+            for orientation in (Orientation.HORIZONTAL, Orientation.VERTICAL)
+            if (
+                vehicle.width if orientation is Orientation.HORIZONTAL else vehicle.length
+            )
+            <= ship.width
+            and (
+                vehicle.length if orientation is Orientation.HORIZONTAL else vehicle.width
+            )
+            <= ship.length
+        ]
+        if vehicle.width == vehicle.length and orientations:
+            orientations = orientations[:1]
+        if not orientations:
+            continue
+
+        for _ in range(max_attempts):
+            orientation = generator.choice(orientations)
+            placed_width = vehicle.width if orientation is Orientation.HORIZONTAL else vehicle.length
+            placed_length = vehicle.length if orientation is Orientation.HORIZONTAL else vehicle.width
+            placement = Placement(
+                vehicle=vehicle,
+                inside=True,
+                x=generator.randrange(ship.width - placed_width + 1),
+                y=generator.randrange(ship.length - placed_length + 1),
+                orientation=orientation,
+            )
+            candidate = state.replace_placement(index, placement)
+            if is_valid_state(candidate):
+                state = with_updated_metrics(candidate, objective_mode)
                 break
 
     return state
-
-
-def _place_vehicle(state, index, vehicle, ship, generator, max_attempts, objective_mode):
-
-    orientations = [
-        orientation
-        for orientation in (Orientation.HORIZONTAL, Orientation.VERTICAL)
-        if (
-            vehicle.width if orientation is Orientation.HORIZONTAL else vehicle.length
-        )
-        <= ship.width
-        and (
-            vehicle.length if orientation is Orientation.HORIZONTAL else vehicle.width
-        )
-        <= ship.length
-    ]
-    if vehicle.width == vehicle.length and orientations:
-        orientations = orientations[:1]
-    if not orientations:
-        return None
-
-    for _ in range(max_attempts):
-        orientation = generator.choice(orientations)
-        placed_width = vehicle.width if orientation is Orientation.HORIZONTAL else vehicle.length
-        placed_length = vehicle.length if orientation is Orientation.HORIZONTAL else vehicle.width
-        placement = Placement(
-            vehicle=vehicle,
-            inside=True,
-            ship_id=ship.id,
-            x=generator.randrange(ship.width - placed_width + 1),
-            y=generator.randrange(ship.length - placed_length + 1),
-            orientation=orientation,
-        )
-        candidate = state.replace_placement(index, placement)
-        if is_valid_state(candidate):
-            return with_updated_metrics(candidate, objective_mode)
-
-    return None
